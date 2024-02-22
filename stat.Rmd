@@ -1,0 +1,152 @@
+---
+title: "statistical analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+Objective: Exploring the trends and factors related to suicide rates across different countries, years, genders, and age groups.
+
+#Loading data
+
+```{r}
+library(tidyverse)
+library(gganimate)
+library(ggplot2)
+library(tidyr)
+data<-read.csv("who_suicide_statistics.csv")
+str(data)
+summary(data)
+```
+
+## Handling null values
+
+```{r}
+# imputing data
+data_imputed <- replace_na(data, list(suicides_no = 0,population=0))
+```
+
+# Descriptive statistics
+
+```{r}
+# Summary statistics of suicide numbers and population grouped by country
+summary_stats <- data_imputed %>%
+  group_by(country) %>%
+  summarize(
+    mean_suicides = mean(suicides_no),
+    mean_population = mean(population)
+  )
+
+# Displaying summary statistics
+head(summary_stats)
+# Summary statistics of suicide numbers and population grouped by year
+summary_stats <- data_imputed %>%
+  group_by(year) %>%
+  summarize(
+    mean_suicides = mean(suicides_no),
+    mean_population = mean(population)
+  )
+
+# Displaying summary statistics
+head(summary_stats)
+# Summary statistics of suicide numbers and population grouped by age
+summary_stats <- data_imputed %>%
+  group_by(age) %>%
+  summarize(
+    mean_suicides = mean(suicides_no),
+    mean_population = mean(population)
+  )
+
+# Displaying summary statistics
+head(summary_stats)
+# Summary statistics of suicide numbers and population grouped by sex
+summary_stats <- data_imputed %>%
+  group_by(sex) %>%
+  summarize(
+    mean_suicides = mean(suicides_no),
+    mean_population = mean(population)
+  )
+
+# Displaying summary statistics
+head(summary_stats)
+```
+
+# Exploratory Data analysis
+
+```{r}
+data_imputed%>%
+  group_by(country)%>%
+  summarise(sum=sum(suicides_no))%>%
+  slice_max(sum,n=10)%>%
+  ggplot(aes(x=reorder(country,desc(sum)),y=sum))+geom_col()+labs(title="Total Suicide numbers according to country(top 10)")+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+new<-data_imputed%>%
+  # selecting required columns
+  select(year,age,suicides_no)%>%
+  group_by(year,age)%>%
+  summarize(sum=sum(suicides_no))
+# creating a ggplot
+a <- ggplot(new, aes(x =age,y = sum,fill=age)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Year: {closest_state}") +
+  geom_text(aes(label = sum),
+            position = position_dodge(0.9), vjust = -1 ) +
+  ylim(0,100500)+
+  theme_light()+
+  transition_states(states = year, transition_length = 10000000000000, state_length = 1000000000000000) + 
+  enter_fade() + 
+  exit_shrink() +
+  ease_aes('quadratic-in-out')+labs(title="time-series graph for trends in suicide number for each age group")
+# gif 
+a_gif <- animate(a, width = 940, height = 480)
+
+a_gif
+```
+
+```{r}
+data_imputed %>%
+  # filtering data
+  filter(population != 0) %>%
+  select(country, suicides_no, population,year) %>%
+  group_by(country) %>%
+  summarise(s = sum(suicides_no), p = sum(population))%>%
+  mutate(rate=s/p*100000)%>%
+  slice_max(rate,n=10)%>%
+  # creating plot
+  ggplot(aes(x=country,y=rate,fill=country))+geom_col()+labs(title="suicide rate for top 10 countries")+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Boxplot of suicides_no by sex
+ggplot(data_imputed, aes(x = sex, y = suicides_no, fill = sex)) +
+  geom_boxplot() +
+  labs(title = "Number of Suicides by Sex", x = "Sex", y = "Number of Suicides") +
+  theme_minimal()
+
+```
+
+# Regression analysis
+
+```{r}
+lm_model <- lm(suicides_no ~ year + sex + age, data = data_imputed)
+
+# Summarizing the regression model
+summary(lm_model)
+```
+> The coefficients indicate the estimated effect of each predictor variable on the number of suicides. For example, being male (sexmale) is associated with an increase of 192.89 in the number of suicides compared to being female. A p-value less than 0.05 (commonly used threshold) suggests that the variable has a significant effect on the number of suicides. The adjusted R-squared value (0.04025) indicates that the model explains about 4.025% of the variance in the number of suicides, suggesting that the model might not be a good fit for the data.
+
+>The regression model suggests that variables such as sex and age group have a significant impact on the number of suicides, while the year variable and the intercept may not be statistically significant predictors.
+
+# ANOVA analysis
+```{r}
+# Fitting ANOVA model
+anova_model <- aov(suicides_no ~ sex, data = data_imputed)
+
+# Summarizing ANOVA results
+summary(anova_model)
+
+```
+>The ANOVA results indicate that there is a significant difference in the mean number of suicidesbetween males and females. The F-value is 678.1, and the p-value is less than 2e-16, which is highly significant.
